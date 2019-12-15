@@ -7,7 +7,7 @@ public protocol PreEncodable: Encodable {
 
 public func preEncode<E: Encodable>(_ entity: E, for request: Request) -> EventLoopFuture<Void> {
     do {
-        let encoder = PreresolveEncoder()
+        let encoder = PreEncoder()
         try entity.encode(to: encoder)
         var resolveEvents = [EventLoopFuture<Void>]()
         
@@ -25,26 +25,26 @@ public func preEncode<E: Encodable>(_ entity: E, for request: Request) -> EventL
     }
 }
 
-fileprivate final class PreresolveEncoder: Encoder {
+fileprivate final class PreEncoder: Encoder {
     var codingPath: [CodingKey] { [] }
     var userInfo: [CodingUserInfoKey : Any] { [:] }
     var preEncodables = [PreEncodable]()
     
     func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-        KeyedEncodingContainer(KeyedPreresolveContainer<Key>(encoder: self))
+        KeyedEncodingContainer(KeyedPreEncodingContainer<Key>(encoder: self))
     }
     
     func unkeyedContainer() -> UnkeyedEncodingContainer {
-        BasicPreresolveContainer(encoder: self)
+        BasicPreEncodingContainer(encoder: self)
     }
     
     func singleValueContainer() -> SingleValueEncodingContainer {
-        BasicPreresolveContainer(encoder: self)
+        BasicPreEncodingContainer(encoder: self)
     }
 }
 
-fileprivate struct KeyedPreresolveContainer<Key: CodingKey>: KeyedEncodingContainerProtocol {
-    let encoder: PreresolveEncoder
+fileprivate struct KeyedPreEncodingContainer<Key: CodingKey>: KeyedEncodingContainerProtocol {
+    let encoder: PreEncoder
     var codingPath: [CodingKey] { [] }
     
     mutating func encodeNil(forKey key: Key) throws {}
@@ -71,11 +71,11 @@ fileprivate struct KeyedPreresolveContainer<Key: CodingKey>: KeyedEncodingContai
     }
     
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
-        KeyedEncodingContainer(KeyedPreresolveContainer<NestedKey>(encoder: encoder))
+        KeyedEncodingContainer(KeyedPreEncodingContainer<NestedKey>(encoder: encoder))
     }
     
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        BasicPreresolveContainer(encoder: encoder)
+        BasicPreEncodingContainer(encoder: encoder)
     }
     
     mutating func superEncoder() -> Encoder {
@@ -87,7 +87,7 @@ fileprivate struct KeyedPreresolveContainer<Key: CodingKey>: KeyedEncodingContai
     }
 }
 
-fileprivate struct BasicPreresolveContainer: UnkeyedEncodingContainer, SingleValueEncodingContainer {
+fileprivate struct BasicPreEncodingContainer: UnkeyedEncodingContainer, SingleValueEncodingContainer {
     mutating func encode(_ value: String) throws {}
     mutating func encode(_ value: Double) throws {}
     mutating func encode(_ value: Float) throws {}
@@ -112,13 +112,13 @@ fileprivate struct BasicPreresolveContainer: UnkeyedEncodingContainer, SingleVal
     
     mutating func encode(_ value: Bool) throws {}
     
-    let encoder: PreresolveEncoder
+    let encoder: PreEncoder
     var codingPath: [CodingKey] { [] }
     var count: Int = 0
     
     
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
-        KeyedEncodingContainer(KeyedPreresolveContainer<NestedKey>(encoder: encoder))
+        KeyedEncodingContainer(KeyedPreEncodingContainer<NestedKey>(encoder: encoder))
     }
     
     mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
