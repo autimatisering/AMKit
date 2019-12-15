@@ -94,7 +94,8 @@ extension Set: JSONDescribedResponse where Element: JSONDescribedResponse {
         try "[\(Element.makeExampleJSON())]"
     }
 }
-extension Set: SecuredResponseEncodable, SecuredContent where Element: SecuredContent {
+
+extension Set: SecuredResponseEncodable, SecuredContent, ResponseEncodable, RequestDecodable, Content where Element: SecuredContent {
     public static var securityContentKey: CodingUserInfoKey {
         Element.securityContentKey
     }
