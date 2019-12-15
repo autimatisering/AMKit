@@ -89,6 +89,19 @@ extension Array: SecuredResponseEncodable, SecuredContent where Element: Secured
     public typealias SecurityContext = Element.SecurityContext
 }
 
+extension Set: JSONDescribedResponse where Element: JSONDescribedResponse {
+    public static func makeExampleJSON() throws -> String {
+        try "[\(Element.makeExampleJSON())]"
+    }
+}
+extension Set: SecuredResponseEncodable, SecuredContent where Element: SecuredContent {
+    public static var securityContentKey: CodingUserInfoKey {
+        Element.securityContentKey
+    }
+    
+    public typealias SecurityContext = Element.SecurityContext
+}
+
 extension Never: DescribedRequest {
     public static var example: Never { fatalError() }
     
