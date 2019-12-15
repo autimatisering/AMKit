@@ -4,21 +4,30 @@ public protocol PreResolvable {
     associatedtype Resolved: Codable
     
     static func shouldResolve(for request: Request, multiple: Bool) -> Bool
-    func resolve(for request: Request) -> EventLoopFuture<Resolved>
+    func resolve(for request: Request) -> EventLoopFuture<Resolved?>
 }
 
+@propertyWrapper
+fileprivate final class ReferenceContaner<T> {
+    var wrappedValue: T
+    
+    init(_ value: T) {
+        self.wrappedValue = value
+    }
+}
 
 @propertyWrapper
-public final class PreResolvedList<
+public struct PreResolvedList<
     C: Codable & Collection, PR: PreResolvable
 >: Codable where C.Element == PR {
     public typealias Resolved = [PR.Resolved]
     
     public var wrappedValue: C
-    private var resolved: [PR.Resolved]?
+    @ReferenceContaner private var resolved: [PR.Resolved]?
     
     public init(_ value: C) {
         self.wrappedValue = value
+        self._resolved = .init(nil)
     }
     
     public func shouldPreEncode(for request: Request) -> Bool {
@@ -34,12 +43,13 @@ public final class PreResolvedList<
             resolved,
             on: request.eventLoop
         ).map { resolved in
-            self.resolved = resolved
+            self.resolved = resolved.compactMap { $0 }
         }
     }
     
     public init(from decoder: Decoder) throws {
         self.wrappedValue = try C(from: decoder)
+        self._resolved = .init(nil)
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -52,12 +62,13 @@ public final class PreResolvedList<
 }
 
 @propertyWrapper
-public final class PreResolved<PR: PreResolvable & Codable>: Codable, PreEncodable {
+public struct PreResolved<PR: PreResolvable & Codable>: Codable, PreEncodable {
     public var wrappedValue: PR
-    private var resolved: PR.Resolved?
+    @ReferenceContaner private var resolved: PR.Resolved?
     
     public init(_ value: PR) {
         self.wrappedValue = value
+        self._resolved = .init(nil)
     }
     
     public func shouldPreEncode(for request: Request) -> Bool {
@@ -72,6 +83,7 @@ public final class PreResolved<PR: PreResolvable & Codable>: Codable, PreEncodab
     
     public init(from decoder: Decoder) throws {
         self.wrappedValue = try PR(from: decoder)
+        self._resolved = .init(nil)
     }
     
     public func encode(to encoder: Encoder) throws {
