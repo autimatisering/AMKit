@@ -1,4 +1,5 @@
 import XCTest
+import IkigaJSON
 import Vapor
 @testable import AMKit
 
@@ -28,6 +29,47 @@ final class AMKitTests: XCTestCase {
         try preEncode(entity, for: Request(application: app, on: app.eventLoopGroup.next())).wait()
         XCTAssertTrue(context.encoded)
         app.shutdown()
+    }
+    
+    func testJSONDecodingErrors() throws {
+        let object: JSONObject = [
+            "firstName": "Joannis",
+            "lastName": "Orlandos"
+        ]
+        
+        struct FullUser: Decodable {
+            let firstName: String
+            let lastName: String
+        }
+        
+        struct PartialUser: Decodable {
+            let firstName: String
+        }
+        
+        struct InvalidFullUser: Decodable {
+            let firstName: Int
+            let lastName: String
+        }
+        
+        struct InvalidPartialUser: Decodable {
+            let firstName: Int
+        }
+        
+        var report = decodingErrors(for: FullUser.self, from: object)
+        XCTAssertTrue(report.errors.isEmpty)
+        XCTAssertTrue(report.unusedKeys.isEmpty)
+        
+        report = decodingErrors(for: PartialUser.self, from: object)
+        XCTAssertTrue(report.errors.isEmpty)
+        XCTAssertEqual(report.unusedKeys.count, 1)
+        
+        report = decodingErrors(for: InvalidFullUser.self, from: object)
+        XCTAssertEqual(report.errors.count, 1)
+        XCTAssertTrue(report.unusedKeys.isEmpty)
+        
+        report = decodingErrors(for: InvalidPartialUser.self, from: object)
+        XCTAssertEqual(report.errors.count, 1)
+        XCTAssertEqual(report.unusedKeys.count, 1)
     }
 
     static var allTests = [
