@@ -343,7 +343,12 @@ struct JSONKeyedValueDecodingContainer<Key: CodingKey>: KeyedDecodingContainerPr
     func unwrapSingle<T: JSONTypeRepresentable>(for key: Key) throws -> T {
         let nextValue = value[key.stringValue]
         guard let value = nextValue as? T else {
-            throw container.error(.invalidValue(path: codingPath + [key], found: self.value.jsonType, needed: T.jsonType))
+            throw container.error(
+                .invalidValue(
+                    path: codingPath + [key],
+                    found: nextValue?.jsonType ?? .none,
+                    needed: T.jsonType)
+            )
         }
         
         return value
@@ -431,7 +436,13 @@ struct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
     
     func unwrapSingle<T: FixedWidthInteger>() throws -> T {
         guard case let .single(value as Int) = value else {
-            throw container.error(.invalidValue(path: codingPath, found: self.value.jsonType, needed: .number))
+            throw container.error(
+                .invalidValue(
+                    path: codingPath,
+                    found: self.value.jsonType,
+                    needed: .number
+                )
+            )
         }
         
         guard let int = T(exactly: value) else {
@@ -443,7 +454,13 @@ struct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
     
     func unwrapSingle<T: JSONTypeRepresentable>() throws -> T {
         guard case let .single(value as T) = value else {
-            throw container.error(.invalidValue(path: codingPath, found: self.value.jsonType, needed: T.jsonType))
+            throw container.error(
+                .invalidValue(
+                    path: codingPath,
+                    found: self.value.jsonType,
+                    needed: T.jsonType
+                )
+            )
         }
         
         return value
@@ -593,7 +610,13 @@ struct JSONUnkeyedValueDecodingContainer: UnkeyedDecodingContainer {
     mutating func unwrapSingle<T: JSONTypeRepresentable>() throws -> T {
         let nextValue = self.nextValue
         guard let value = nextValue as? T else {
-            throw container.error(.invalidValue(path: codingPath, found: self.value.jsonType, needed: T.jsonType))
+            throw container.error(
+                .invalidValue(
+                    path: codingPath,
+                    found: nextValue?.jsonType ?? .none,
+                    needed: T.jsonType
+                )
+            )
         }
         
         return value
