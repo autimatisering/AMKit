@@ -7,7 +7,7 @@ struct SecRouterConfigKey: StorageKey {
 public protocol SecRouterConfig {
     var developmentMode: Bool { get }
     
-    func makeJSONDecodingErrorResponse(report: JSONErrorReport) -> AbortError
+    func makeJSONDecodingErrorResponse(report: JSONErrorReport) -> Error
 }
 
 extension Application {
