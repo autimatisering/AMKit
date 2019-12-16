@@ -11,7 +11,7 @@ public protocol SecRouterConfig {
 }
 
 extension Application {
-    var secRouterConfig: SecRouterConfig? {
+    public var secRouterConfig: SecRouterConfig? {
         get {
             storage.get(SecRouterConfigKey.self)
         }
