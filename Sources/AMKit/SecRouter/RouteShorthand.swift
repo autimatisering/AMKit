@@ -1,4 +1,25 @@
 import Vapor
+import IkigaJSON
+
+fileprivate extension Request {
+    func decodeReportingErrors<Input: Decodable>(_ input: Input.Type) throws -> Input {
+        do {
+            return try content.decode(input)
+        } catch {
+            guard
+                let config = application.secRouterConfig,
+                config.developmentMode,
+                let buffer = body.data
+            else {
+                throw error
+            }
+            
+            let object = try JSONObject(buffer: buffer)
+            let report = decodingErrors(for: Input.self, from: object)
+            throw config.makeJSONDecodingErrorResponse(report: report)
+        }
+    }
+}
 
 public func GET<SRE: SecuredResponseEncodable>(
     _ path: RichPathComponent...,
@@ -32,7 +53,7 @@ public func PATCH<SRE: SecuredResponseEncodable, Input: DescribedRequest & Conte
         path: path,
         input: Input.self
     ) { request -> SRE in
-        let input = try request.content.decode(Input.self)
+        let input = try request.decodeReportingErrors(Input.self)
         return try run(request, input)
     }
 }
@@ -55,7 +76,7 @@ public func PUT<SRE: SecuredResponseEncodable, Input: DescribedRequest & Content
         path: path,
         input: Input.self
     ) { request -> SRE in
-        let input = try request.content.decode(Input.self)
+        let input = try request.decodeReportingErrors(Input.self)
         return try run(request, input)
     }
 }
@@ -78,7 +99,7 @@ public func POST<SRE: SecuredResponseEncodable, Input: DescribedRequest & Conten
         path: path,
         input: Input.self
     ) { request -> SRE in
-        let input = try request.content.decode(Input.self)
+        let input = try request.decodeReportingErrors(Input.self)
         return try run(request, input)
     }
 }
