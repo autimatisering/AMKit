@@ -295,7 +295,7 @@ struct JSONKeyedValueDecodingContainer<Key: CodingKey>: KeyedDecodingContainerPr
     }
     
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable {
-        let decoder = JSONObjectInspectorDecoder(codingPath: codingPath, userInfo: self.decoder.userInfo, value: .object(value), container: container)
+        let decoder = JSONObjectInspectorDecoder(codingPath: codingPath, userInfo: self.decoder.userInfo, value: .single(value[key.stringValue]), container: container)
         return try T(from: decoder)
     }
     
