@@ -31,8 +31,6 @@ public protocol SecuredContent: Content, SecuredResponseEncodable {
     associatedtype SecurityContext: SecuredResponseEncodingContext
 }
 
-public protocol PreEncodedSecuredContent: SecuredContent {}
-
 extension EncodableExample {
     public static func makeExampleJSON() throws -> String {
         let encoder = JSONEncoder()
@@ -43,8 +41,16 @@ extension EncodableExample {
     }
 }
 
-extension PreEncodedSecuredContent {
+extension SecuredContent {
     public func encodeResponse(for request: Request) -> EventLoopFuture<Response> {
+        if request.application.secRouterConfig?.preEncodeResponses == true {
+            return encodeResponseWithPreEncoding(for: request)
+        } else {
+            return encodeResponseWithoutPreEncoding(for: request)
+        }
+    }
+    
+    private func encodeResponseWithPreEncoding(for request: Request) -> EventLoopFuture<Response> {
         return preEncode(self, for: request).flatMapThrowing {
             var encoder = IkigaJSONEncoder()
             encoder.settings.dateDecodingStrategy = .iso8601
@@ -57,10 +63,8 @@ extension PreEncodedSecuredContent {
             return response
         }
     }
-}
-
-extension SecuredContent {
-    public func encodeResponse(for request: Request) -> EventLoopFuture<Response> {
+    
+    public func encodeResponseWithoutPreEncoding(for request: Request) -> EventLoopFuture<Response> {
         var encoder = IkigaJSONEncoder()
         encoder.settings.dateDecodingStrategy = .iso8601
         
@@ -89,7 +93,6 @@ extension Array: SecuredResponseEncodable, SecuredContent where Element: Secured
     
     public typealias SecurityContext = Element.SecurityContext
 }
-extension Array: PreEncodedSecuredContent where Element: PreEncodedSecuredContent {}
 
 extension Set: JSONDescribedResponse where Element: JSONDescribedResponse {
     public static func makeExampleJSON() throws -> String {

@@ -6,6 +6,7 @@ struct SecRouterConfigKey: StorageKey {
 
 public protocol SecRouterConfig {
     var developmentMode: Bool { get }
+    var preEncodeResponses: Bool { get }
     
     func makeJSONDecodingErrorResponse(report: JSONErrorReport) -> Error
 }
