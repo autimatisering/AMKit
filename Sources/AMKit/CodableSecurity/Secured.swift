@@ -9,7 +9,11 @@ public struct Secured<Rule: SecurityRule> {
 
 extension Secured: Encodable where Rule.SecuredProperty: Encodable {
     public func encode(to encoder: Encoder) throws {
-        let context = encoder.userInfo[Rule.contextUserInfoKey] as? Rule.UserInfoContext
+        guard
+            let context = encoder.userInfo[Rule.contextUserInfoKey] as? Rule.UserInfoContext
+        else {
+            try wrappedValue.encode(to: encoder)
+        }
         
         guard
             let subject = encoder.userInfo[SecurityHelper.subjectKey] as? Rule.EncoderSubject,
