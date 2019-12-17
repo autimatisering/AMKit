@@ -37,6 +37,7 @@ extension EncodableExample {
     public static func makeExampleJSON() throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
+        encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(example)
         return String(data: data, encoding: .utf8)!
     }
