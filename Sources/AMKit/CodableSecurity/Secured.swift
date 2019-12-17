@@ -13,6 +13,7 @@ extension Secured: Encodable where Rule.SecuredProperty: Encodable {
             let context = encoder.userInfo[Rule.contextUserInfoKey] as? Rule.UserInfoContext
         else {
             try wrappedValue.encode(to: encoder)
+            return
         }
         
         guard
