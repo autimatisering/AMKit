@@ -19,7 +19,7 @@ fileprivate final class ReferenceContaner<T> {
 @propertyWrapper
 public struct PreResolvedList<
     C: Codable & Collection, PR: PreResolvable
->: Codable where C.Element == PR {
+>: Codable, PreEncodable where C.Element == PR {
     public typealias Resolved = [PR.Resolved]
     
     public var wrappedValue: C
