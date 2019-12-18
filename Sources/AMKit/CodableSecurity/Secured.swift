@@ -20,7 +20,7 @@ extension Secured: Encodable where Rule.SecuredProperty: Encodable {
             let subject = encoder.userInfo[SecurityHelper.subjectKey] as? Rule.EncoderSubject,
             Rule.canEncode(wrappedValue, subject: subject, inContext: context)
         else {
-            var container = try encoder.singleValueContainer()
+            var container = encoder.singleValueContainer()
             try container.encodeNil()
             return
         }
