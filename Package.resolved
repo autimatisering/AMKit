@@ -33,8 +33,8 @@
         "repositoryURL": "https://github.com/autimatisering/IkigaJSON.git",
         "state": {
           "branch": null,
-          "revision": "6fe4099af2e964497f4beab74be45b393c4996ec",
-          "version": "2.0.1"
+          "revision": "fdde3d71239122db7da6c956960359adc3d34e12",
+          "version": "2.0.2"
         }
       },
       {
@@ -132,8 +132,8 @@
         "repositoryURL": "https://github.com/vapor/websocket-kit.git",
         "state": {
           "branch": null,
-          "revision": "3c3bf59b027e53d19d36b98ab7f6b4291d5e1f64",
-          "version": "2.0.0-beta.2"
+          "revision": "4c9da4fe7d8186243418254031288ab5ee0202e4",
+          "version": "2.0.0-beta.2.1"
         }
       }
     ]
