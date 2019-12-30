@@ -1,6 +1,8 @@
 import Vapor
 import IkigaJSON
 
+public struct SecuredEncodingPermissionError: Error {}
+
 public protocol JSONDescribedResponse {
     static func makeExampleJSON() throws -> String
 }
@@ -29,6 +31,8 @@ public protocol SecuredContent: Content, SecuredResponseEncodable {
     static var securityContentKey: CodingUserInfoKey { get }
     
     associatedtype SecurityContext: SecuredResponseEncodingContext
+    
+    func canEncode(for request: Request) -> EventLoopFuture<Bool>
 }
 
 extension EncodableExample {
@@ -51,16 +55,24 @@ extension SecuredContent {
     }
     
     private func encodeResponseWithPreEncoding(for request: Request) -> EventLoopFuture<Response> {
-        return preEncode(self, for: request).flatMapThrowing {
-            var encoder = IkigaJSONEncoder()
-            encoder.settings.dateDecodingStrategy = .iso8601
-            
-            SecurityHelper.updateContext(in: &encoder.userInfo, forSubject: self)
-            encoder.userInfo[Self.securityContentKey] = try SecurityContext(from: request)
-            
-            let response = Response()
-            try response.content.encode(self, using: encoder)
-            return response
+        return self.canEncode(for: request).flatMap { canEncode in
+            guard canEncode else {
+                let error = SecuredEncodingPermissionError()
+                return request.eventLoop.makeFailedFuture(error)
+            }
+                
+            return preEncode(self, for: request).flatMapThrowing {
+                var encoder = IkigaJSONEncoder()
+                encoder.settings.dateDecodingStrategy = .iso8601
+                
+                SecurityHelper.updateContext(in: &encoder.userInfo, forSubject: self)
+                let context = try SecurityContext(from: request)
+                encoder.userInfo[Self.securityContentKey] = context
+                
+                let response = Response()
+                try response.content.encode(self, using: encoder)
+                return response
+            }
         }
     }
     
@@ -70,11 +82,18 @@ extension SecuredContent {
         
         do {
             SecurityHelper.updateContext(in: &encoder.userInfo, forSubject: self)
-            encoder.userInfo[Self.securityContentKey] = try SecurityContext(from: request)
+            let context = try SecurityContext(from: request)
             
-            let response = Response()
-            try response.content.encode(self, using: encoder)
-            return request.eventLoop.makeSucceededFuture(response)
+            encoder.userInfo[Self.securityContentKey] = context
+            return self.canEncode(for: request).flatMapThrowing { canEncode in
+                guard canEncode else {
+                    throw SecuredEncodingPermissionError()
+                }
+                
+                let response = Response()
+                try response.content.encode(self, using: encoder)
+                return response
+            }
         } catch {
             return request.eventLoop.makeFailedFuture(error)
         }
@@ -86,7 +105,16 @@ extension Array: JSONDescribedResponse where Element: JSONDescribedResponse {
         try "[\(Element.makeExampleJSON())]"
     }
 }
-extension Array: SecuredResponseEncodable, SecuredContent where Element: SecuredContent {
+extension Array: SecuredResponseEncodable where Element: SecuredContent {}
+
+extension Array: SecuredContent where Element: SecuredContent {
+    public func canEncode(for request: Request) -> EventLoopFuture<Bool> {
+        let canEncodeResults = map { $0.canEncode(for: request) }
+        return EventLoopFuture.whenAllSucceed(canEncodeResults, on: request.eventLoop).map { canEncode in
+            return canEncode.reduce(true) { $0 && $1 }
+        }
+    }
+    
     public static var securityContentKey: CodingUserInfoKey {
         Element.securityContentKey
     }
@@ -101,6 +129,13 @@ extension Set: JSONDescribedResponse where Element: JSONDescribedResponse {
 }
 
 extension Set: SecuredResponseEncodable, SecuredContent, ResponseEncodable, RequestDecodable, Content where Element: SecuredContent {
+    public func canEncode(for request: Request) -> EventLoopFuture<Bool> {
+        let canEncodeResults = map { $0.canEncode(for: request) }
+        return EventLoopFuture.whenAllSucceed(canEncodeResults, on: request.eventLoop).map { canEncode in
+            return canEncode.reduce(true) { $0 && $1 }
+        }
+    }
+    
     public static var securityContentKey: CodingUserInfoKey {
         Element.securityContentKey
     }
