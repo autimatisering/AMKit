@@ -63,6 +63,9 @@ extension SecuredContent {
                 
             return preEncode(self, for: request).flatMapThrowing {
                 var encoder = IkigaJSONEncoder()
+                // Nil as null is required for secured encodable to produce valid JSON
+                // This is due to an IkgiaJSON Bug
+                encoder.settings.encodeNilAsNull = true
                 encoder.settings.dateDecodingStrategy = .iso8601
                 
                 SecurityHelper.updateContext(in: &encoder.userInfo, forSubject: self)
@@ -78,6 +81,10 @@ extension SecuredContent {
     
     public func encodeResponseWithoutPreEncoding(for request: Request) -> EventLoopFuture<Response> {
         var encoder = IkigaJSONEncoder()
+        
+        // Nil as null is required for secured encodable to produce valid JSON
+        // This is due to an IkgiaJSON Bug
+        encoder.settings.encodeNilAsNull = true
         encoder.settings.dateDecodingStrategy = .iso8601
         
         do {
