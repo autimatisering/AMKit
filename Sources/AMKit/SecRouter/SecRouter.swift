@@ -62,8 +62,8 @@ extension SecuredContent {
             }
                 
             return preEncode(self, for: request).flatMapThrowing {
-                var encoder = JSONEncoder()
-                encoder.dateDecodingStrategy = .iso8601
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .iso8601
                 
                 SecurityHelper.updateContext(in: &encoder.userInfo, forSubject: self)
                 let context = try SecurityContext(from: request)
@@ -77,9 +77,8 @@ extension SecuredContent {
     }
     
     public func encodeResponseWithoutPreEncoding(for request: Request) -> EventLoopFuture<Response> {
-        var encoder = JSONEncoder()
-        
-        encoder.dateDecodingStrategy = .iso8601
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
         
         do {
             SecurityHelper.updateContext(in: &encoder.userInfo, forSubject: self)
