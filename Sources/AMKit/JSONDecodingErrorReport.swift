@@ -85,11 +85,17 @@ public enum JSONTypeExpectation {
     case object, array, string, number, null, none, bool
 }
 
-public func decodingErrors<D: Decodable>(for entity: D.Type, from object: JSONObject) -> JSONErrorReport {
+public func decodingErrors<D: Decodable>(for entity: D.Type, from object: JSONObject, settings: JSONDecoderSettings = .init()) -> JSONErrorReport {
     let container = ErrorContainer(stopOnErrors: true)
     
     do {
-        let decoder = JSONObjectInspectorDecoder(codingPath: [], userInfo: [:], value: .object(object), container: container)
+        let decoder = JSONObjectInspectorDecoder(
+            codingPath: [],
+            userInfo: [:],
+            value: .object(object),
+            settings: settings,
+            container: container
+        )
         _ = try D(from: decoder)
     } catch {}
     
@@ -97,7 +103,7 @@ public func decodingErrors<D: Decodable>(for entity: D.Type, from object: JSONOb
 }
 
 public enum JSONInspectorError: Error {
-    case invalidValue(path: [CodingKey], found: JSONTypeExpectation, needed: JSONTypeExpectation)
+    case invalidValue(path: [CodingKey], found: JSONTypeExpectation, needed: JSONTypeExpectation, type: Any.Type)
     case invalidInteger(path: [CodingKey], found: Int, needed: Any.Type)
 }
 
@@ -174,6 +180,7 @@ internal struct JSONObjectInspectorDecoder: Decoder {
     var codingPath: [CodingKey]
     var userInfo = [CodingUserInfoKey : Any]()
     let value: JSONInspectedValue
+    var settings: JSONDecoderSettings
     let container: ErrorContainer
     
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
@@ -182,7 +189,7 @@ internal struct JSONObjectInspectorDecoder: Decoder {
             let container = JSONKeyedValueDecodingContainer<Key>(value: object, decoder: self)
             return KeyedDecodingContainer(container)
         default:
-            throw container.error(.invalidValue(path: codingPath, found: value.jsonType, needed: .object))
+            throw container.error(.invalidValue(path: codingPath, found: value.jsonType, needed: .object, type: JSONObject.self))
         }
     }
     
@@ -195,7 +202,7 @@ internal struct JSONObjectInspectorDecoder: Decoder {
         case .array(let array), .single(let array as JSONArray):
             return JSONUnkeyedValueDecodingContainer(value: array, decoder: self)
         default:
-            throw container.error(.invalidValue(path: codingPath, found: value.jsonType, needed: .array))
+            throw container.error(.invalidValue(path: codingPath, found: value.jsonType, needed: .array, type: JSONArray.self))
         }
     }
 }
@@ -295,27 +302,45 @@ struct JSONKeyedValueDecodingContainer<Key: CodingKey>: KeyedDecodingContainerPr
     }
     
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable {
-        let decoder = JSONObjectInspectorDecoder(codingPath: codingPath, userInfo: self.decoder.userInfo, value: .single(value[key.stringValue]), container: container)
+        let decoder = JSONObjectInspectorDecoder(
+            codingPath: codingPath,
+            userInfo: self.decoder.userInfo,
+            value: .single(value[key.stringValue]),
+            settings: self.decoder.settings,
+            container: container
+        )
         return try T(from: decoder)
     }
     
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
         let nextValue = value[key.stringValue]
         guard let value = nextValue as? JSONObject else {
-            throw container.error(.invalidValue(path: codingPath + [key], found: nextValue?.jsonType ?? .none, needed: .object))
+            throw container.error(.invalidValue(path: codingPath + [key], found: nextValue?.jsonType ?? .none, needed: .object, type: JSONObject.self))
         }
         
-        let decoder = JSONObjectInspectorDecoder(codingPath: codingPath + [key], userInfo: self.decoder.userInfo, value: .object(value), container: container)
+        let decoder = JSONObjectInspectorDecoder(
+            codingPath: codingPath + [key],
+            userInfo: self.decoder.userInfo,
+            value: .object(value),
+            settings: self.decoder.settings,
+            container: container
+        )
         return try decoder.container(keyedBy: type)
     }
     
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
         let nextValue = value[key.stringValue]
         guard let value = nextValue as? JSONArray else {
-            throw container.error(.invalidValue(path: codingPath + [key], found: nextValue?.jsonType ?? .none, needed: .array))
+            throw container.error(.invalidValue(path: codingPath + [key], found: nextValue?.jsonType ?? .none, needed: .array, type: JSONArray.self))
         }
         
-        let decoder = JSONObjectInspectorDecoder(codingPath: codingPath + [key], userInfo: self.decoder.userInfo, value: .array(value), container: container)
+        let decoder = JSONObjectInspectorDecoder(
+            codingPath: codingPath + [key],
+            userInfo: self.decoder.userInfo,
+            value: .array(value),
+            settings: self.decoder.settings,
+            container: container
+        )
         return try decoder.unkeyedContainer()
     }
     
@@ -330,7 +355,7 @@ struct JSONKeyedValueDecodingContainer<Key: CodingKey>: KeyedDecodingContainerPr
     func unwrapSingle<T: FixedWidthInteger>(for key: Key) throws -> T {
         let nextValue = value[key.stringValue]
         guard let value = nextValue as? Int else {
-            throw container.error(.invalidValue(path: codingPath + [key], found: nextValue?.jsonType ?? .none, needed: .number))
+            throw container.error(.invalidValue(path: codingPath + [key], found: nextValue?.jsonType ?? .none, needed: .number, type: T.self))
         }
         
         guard let int = T(exactly: value) else {
@@ -347,7 +372,9 @@ struct JSONKeyedValueDecodingContainer<Key: CodingKey>: KeyedDecodingContainerPr
                 .invalidValue(
                     path: codingPath + [key],
                     found: nextValue?.jsonType ?? .none,
-                    needed: T.jsonType)
+                    needed: T.jsonType,
+                    type: T.self
+                )
             )
         }
         
@@ -426,7 +453,13 @@ struct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
     }
     
     func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
-        let decoder = JSONObjectInspectorDecoder(codingPath: codingPath, userInfo: self.decoder.userInfo, value: value, container: container)
+        let decoder = JSONObjectInspectorDecoder(
+            codingPath: codingPath,
+            userInfo: self.decoder.userInfo,
+            value: value,
+            settings: self.decoder.settings,
+            container: container
+        )
         return try T(from: decoder)
     }
 
@@ -440,7 +473,8 @@ struct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
                 .invalidValue(
                     path: codingPath,
                     found: self.value.jsonType,
-                    needed: .number
+                    needed: .number,
+                    type: T.self
                 )
             )
         }
@@ -458,7 +492,8 @@ struct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
                 .invalidValue(
                     path: codingPath,
                     found: self.value.jsonType,
-                    needed: T.jsonType
+                    needed: T.jsonType,
+                    type: T.self
                 )
             )
         }
@@ -492,14 +527,15 @@ struct JSONUnkeyedValueDecodingContainer: UnkeyedDecodingContainer {
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
         let index = currentIndex
         let nextValue = self.nextValue
-        guard let array = nextValue as? JSONArray else {
-            throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .array))
+        guard let object = nextValue as? JSONObject else {
+            throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .array, type: JSONArray.self))
         }
         
         let decoder = JSONObjectInspectorDecoder(
             codingPath: codingPath + [_CodingKey.init(intValue: index)],
             userInfo: self.decoder.userInfo,
-            value: .array(array),
+            value: .object(object),
+            settings: self.decoder.settings,
             container: container
         )
         return try decoder.container(keyedBy: type)
@@ -509,13 +545,14 @@ struct JSONUnkeyedValueDecodingContainer: UnkeyedDecodingContainer {
         let index = currentIndex
         let nextValue = self.nextValue
         guard let array = nextValue as? JSONArray else {
-            throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .array))
+            throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .array, type: JSONArray.self))
         }
         
         let decoder = JSONObjectInspectorDecoder(
             codingPath: codingPath + [_CodingKey.init(intValue: index)],
             userInfo: self.decoder.userInfo,
             value: .array(array),
+            settings: self.decoder.settings,
             container: container
         )
         return try decoder.unkeyedContainer()
@@ -586,8 +623,68 @@ struct JSONUnkeyedValueDecodingContainer: UnkeyedDecodingContainer {
     }
     
     mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
-        let decoder = JSONObjectInspectorDecoder(codingPath: codingPath, userInfo: self.decoder.userInfo, value: .single(nextValue), container: container)
-        return try T(from: decoder)
+        let nextValue = self.nextValue
+        
+        if T.self is Date.Type {
+            switch self.decoder.settings.dateDecodingStrategy {
+            case .iso8601:
+                guard
+                    let string = nextValue?.string,
+                    let date = ISO8601DateFormatter().date(from: string)
+                else {
+                    throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .string, type: type))
+                }
+                
+                return date as! T
+            case .formatted(let formatter):
+                guard
+                    let string = nextValue?.string,
+                    let date = formatter.date(from: string)
+                else {
+                    throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .string, type: type))
+                }
+                
+                return date as! T
+            case .secondsSince1970, .millisecondsSince1970:
+                if let double = nextValue?.double {
+                    return Date(timeIntervalSince1970: double) as! T
+                } else if let int = nextValue?.int {
+                    return Date(timeIntervalSince1970: Double(int)) as! T
+                } else {
+                    throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .number, type: type))
+                }
+            case .custom(let decode):
+                let decoder = JSONObjectInspectorDecoder(
+                    codingPath: codingPath,
+                    userInfo: self.decoder.userInfo,
+                    value: .single(nextValue),
+                    settings: self.decoder.settings,
+                    container: container
+                )
+                return try decode(decoder) as! T
+            case .deferredToDate:
+                fallthrough
+            @unknown default:
+                let decoder = JSONObjectInspectorDecoder(
+                    codingPath: codingPath,
+                    userInfo: self.decoder.userInfo,
+                    value: .single(nextValue),
+                    settings: self.decoder.settings,
+                    container: container
+                )
+                
+                return try T(from: decoder)
+            }
+        } else {
+            let decoder = JSONObjectInspectorDecoder(
+                codingPath: codingPath,
+                userInfo: self.decoder.userInfo,
+                value: .single(nextValue),
+                settings: self.decoder.settings,
+                container: container
+            )
+            return try T(from: decoder)
+        }
     }
 
     mutating func decode(_ type: Bool.Type) throws -> Bool {
@@ -597,7 +694,7 @@ struct JSONUnkeyedValueDecodingContainer: UnkeyedDecodingContainer {
     mutating func unwrapSingle<T: FixedWidthInteger>() throws -> T {
         let nextValue = self.nextValue
         guard let value = nextValue as? Int else {
-            throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .number))
+            throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .number, type: T.self))
         }
         
         guard let int = T(exactly: value) else {
@@ -614,7 +711,8 @@ struct JSONUnkeyedValueDecodingContainer: UnkeyedDecodingContainer {
                 .invalidValue(
                     path: codingPath,
                     found: nextValue?.jsonType ?? .none,
-                    needed: T.jsonType
+                    needed: T.jsonType,
+                    type: T.self
                 )
             )
         }

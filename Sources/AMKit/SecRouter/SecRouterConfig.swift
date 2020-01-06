@@ -1,4 +1,5 @@
 import Vapor
+import IkigaJSON
 
 struct SecRouterConfigKey: StorageKey {
     public typealias Value = SecRouterConfig
@@ -7,8 +8,17 @@ struct SecRouterConfigKey: StorageKey {
 public protocol SecRouterConfig {
     var developmentMode: Bool { get }
     var preEncodeResponses: Bool { get }
+    var jsonErrorDecodingSettings: JSONDecoderSettings { get }
     
     func makeJSONDecodingErrorResponse(report: JSONErrorReport) -> Error
+}
+
+extension SecRouterConfig {
+    public var jsonErrorDecodingSettings: JSONDecoderSettings {
+        var settings = JSONDecoderSettings()
+        settings.dateDecodingStrategy = .iso8601
+        return settings
+    }
 }
 
 extension Application {

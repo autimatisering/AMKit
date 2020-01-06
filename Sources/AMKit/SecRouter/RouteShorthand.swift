@@ -15,7 +15,7 @@ fileprivate extension Request {
             }
             
             let object = try JSONObject(buffer: buffer)
-            let report = decodingErrors(for: Input.self, from: object)
+            let report = decodingErrors(for: Input.self, from: object, settings: config.jsonErrorDecodingSettings)
             throw config.makeJSONDecodingErrorResponse(report: report)
         }
     }
