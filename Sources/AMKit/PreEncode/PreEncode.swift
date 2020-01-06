@@ -65,9 +65,9 @@ fileprivate struct KeyedPreEncodingContainer<Key: CodingKey>: KeyedEncodingConta
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable {
         if let value = value as? PreEncodable {
             encoder.preEncodables.append(value)
-        } else {
-           try value.encode(to: encoder)
-       }
+        }
+        
+        try value.encode(to: encoder)
     }
     
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
@@ -105,9 +105,9 @@ fileprivate struct BasicPreEncodingContainer: UnkeyedEncodingContainer, SingleVa
     mutating func encode<T>(_ value: T) throws where T : Encodable {
         if let value = value as? PreEncodable {
             encoder.preEncodables.append(value)
-        } else {
-            try value.encode(to: encoder)
         }
+        
+        try value.encode(to: encoder)
     }
     
     mutating func encode(_ value: Bool) throws {}
