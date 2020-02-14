@@ -309,7 +309,7 @@ struct JSONKeyedValueDecodingContainer<Key: CodingKey>: KeyedDecodingContainerPr
             settings: self.decoder.settings,
             container: container
         )
-        var container = try decoder.singleValueContainer()
+        let container = try decoder.singleValueContainer()
         return try container.decode(T.self)
     }
     
@@ -454,15 +454,66 @@ struct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
     }
     
     func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
-        let decoder = JSONObjectInspectorDecoder(
-            codingPath: codingPath,
-            userInfo: self.decoder.userInfo,
-            value: value,
-            settings: self.decoder.settings,
-            container: container
-        )
-        var container = try decoder.singleValueContainer()
-        return try container.decode(T.self)
+        if T.self is Date.Type {
+            switch self.decoder.settings.dateDecodingStrategy {
+            case .iso8601:
+                guard
+                    case .single(let string as String) = value,
+                    let date = ISO8601DateFormatter().date(from: string)
+                else {
+                    throw container.error(.invalidValue(path: codingPath, found: value.jsonType, needed: .string, type: type))
+                }
+                
+                return date as! T
+            case .formatted(let formatter):
+                guard
+                case .single(let string as String) = value,
+                    let date = formatter.date(from: string)
+                else {
+                    throw container.error(.invalidValue(path: codingPath, found: value.jsonType, needed: .string, type: type))
+                }
+                
+                return date as! T
+            case .secondsSince1970, .millisecondsSince1970:
+                if case .single(let double as Double) = value {
+                    return Date(timeIntervalSince1970: double) as! T
+                } else if case .single(let int as Int) = value {
+                    return Date(timeIntervalSince1970: Double(int)) as! T
+                } else {
+                    throw container.error(.invalidValue(path: codingPath, found: value.jsonType, needed: .number, type: type))
+                }
+            case .custom(let decode):
+                let decoder = JSONObjectInspectorDecoder(
+                    codingPath: codingPath,
+                    userInfo: self.decoder.userInfo,
+                    value: value,
+                    settings: self.decoder.settings,
+                    container: container
+                )
+                return try decode(decoder) as! T
+            case .deferredToDate:
+                fallthrough
+            @unknown default:
+                let decoder = JSONObjectInspectorDecoder(
+                    codingPath: codingPath,
+                    userInfo: self.decoder.userInfo,
+                    value: value,
+                    settings: self.decoder.settings,
+                    container: container
+                )
+                
+                return try T(from: decoder)
+            }
+        } else {
+            let decoder = JSONObjectInspectorDecoder(
+                codingPath: codingPath,
+                userInfo: self.decoder.userInfo,
+                value: value,
+                settings: self.decoder.settings,
+                container: container
+            )
+            return try T(from: decoder)
+        }
     }
 
     func decode(_ type: Bool.Type) throws -> Bool {
@@ -625,68 +676,14 @@ struct JSONUnkeyedValueDecodingContainer: UnkeyedDecodingContainer {
     }
     
     mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
-        let nextValue = self.nextValue
-        
-        if T.self is Date.Type {
-            switch self.decoder.settings.dateDecodingStrategy {
-            case .iso8601:
-                guard
-                    let string = nextValue?.string,
-                    let date = ISO8601DateFormatter().date(from: string)
-                else {
-                    throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .string, type: type))
-                }
-                
-                return date as! T
-            case .formatted(let formatter):
-                guard
-                    let string = nextValue?.string,
-                    let date = formatter.date(from: string)
-                else {
-                    throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .string, type: type))
-                }
-                
-                return date as! T
-            case .secondsSince1970, .millisecondsSince1970:
-                if let double = nextValue?.double {
-                    return Date(timeIntervalSince1970: double) as! T
-                } else if let int = nextValue?.int {
-                    return Date(timeIntervalSince1970: Double(int)) as! T
-                } else {
-                    throw container.error(.invalidValue(path: codingPath, found: nextValue?.jsonType ?? .none, needed: .number, type: type))
-                }
-            case .custom(let decode):
-                let decoder = JSONObjectInspectorDecoder(
-                    codingPath: codingPath,
-                    userInfo: self.decoder.userInfo,
-                    value: .single(nextValue),
-                    settings: self.decoder.settings,
-                    container: container
-                )
-                return try decode(decoder) as! T
-            case .deferredToDate:
-                fallthrough
-            @unknown default:
-                let decoder = JSONObjectInspectorDecoder(
-                    codingPath: codingPath,
-                    userInfo: self.decoder.userInfo,
-                    value: .single(nextValue),
-                    settings: self.decoder.settings,
-                    container: container
-                )
-                
-                return try T(from: decoder)
-            }
-        } else {
-            let decoder = JSONObjectInspectorDecoder(
-                codingPath: codingPath,
-                userInfo: self.decoder.userInfo,
-                value: .single(nextValue),
-                settings: self.decoder.settings,
-                container: container
-            )
-            return try T(from: decoder)
-        }
+        let decoder = JSONObjectInspectorDecoder(
+            codingPath: codingPath,
+            userInfo: self.decoder.userInfo,
+            value: .single(self.nextValue),
+            settings: self.decoder.settings,
+            container: container
+        )
+        return try decoder.singleValueContainer().decode(type)
     }
 
     mutating func decode(_ type: Bool.Type) throws -> Bool {
