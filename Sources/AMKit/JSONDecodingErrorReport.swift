@@ -309,7 +309,8 @@ struct JSONKeyedValueDecodingContainer<Key: CodingKey>: KeyedDecodingContainerPr
             settings: self.decoder.settings,
             container: container
         )
-        return try T(from: decoder)
+        var container = try decoder.singleValueContainer()
+        return try container.decode(T.self)
     }
     
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
@@ -460,7 +461,8 @@ struct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
             settings: self.decoder.settings,
             container: container
         )
-        return try T(from: decoder)
+        var container = try decoder.singleValueContainer()
+        return try container.decode(T.self)
     }
 
     func decode(_ type: Bool.Type) throws -> Bool {
