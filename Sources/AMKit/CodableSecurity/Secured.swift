@@ -9,10 +9,12 @@ public struct Secured<Rule: SecurityRule> {
 
 extension Secured: Encodable where Rule.SecuredProperty: Encodable {
     public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        
         guard
             let context = encoder.userInfo[Rule.contextUserInfoKey] as? Rule.UserInfoContext
         else {
-            try wrappedValue.encode(to: encoder)
+            try container.encode(wrappedValue)
             return
         }
         
@@ -20,18 +22,18 @@ extension Secured: Encodable where Rule.SecuredProperty: Encodable {
             let subject = encoder.userInfo[SecurityHelper.subjectKey] as? Rule.EncoderSubject,
             Rule.canEncode(wrappedValue, subject: subject, inContext: context)
         else {
-            var container = encoder.singleValueContainer()
             try container.encodeNil()
             return
         }
         
-        try wrappedValue.encode(to: encoder)
+        try container.encode(wrappedValue)
     }
 }
 
 extension Secured: Decodable where Rule.SecuredProperty: Decodable {
     public init(from decoder: Decoder) throws {
-        wrappedValue = try Rule.SecuredProperty(from: decoder)
+        let container = decoder.singleValueContainer()
+        wrappedValue = try container.decode(Rule.SecuredProperty.self)
         
         guard Rule.validate(wrappedValue) else {
             throw SecurityRuleError<Rule>.validationFailed(value: wrappedValue, rule: Rule.self)
