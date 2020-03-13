@@ -32,7 +32,7 @@ extension Secured: Encodable where Rule.SecuredProperty: Encodable {
 
 extension Secured: Decodable where Rule.SecuredProperty: Decodable {
     public init(from decoder: Decoder) throws {
-        let container = decoder.singleValueContainer()
+        let container = try decoder.singleValueContainer()
         wrappedValue = try container.decode(Rule.SecuredProperty.self)
         
         guard Rule.validate(wrappedValue) else {
