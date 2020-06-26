@@ -14,7 +14,7 @@ extension Route {
             path: path.map { $0.pathComponent },
             responder: BasicResponder { request in
                 if case .collect(let max) = body, request.body.data == nil {
-                    return request.body.collect(max: max).flatMapThrowing { _ in
+                    return request.body.collect(max: max?.value).flatMapThrowing { _ in
                         return try route(request)
                     }.encodeResponse(for: request)
                 } else {
